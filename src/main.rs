@@ -40,12 +40,10 @@ impl Treap {
             Node(x, y, _, left, right) => {
                 if x <= k {
                     let (l, r) = right.split(k);
-                    let t = Treap::new(x, y, left, Box::new(l));
-                    (t, r)
+                    (Treap::new(x, y, left, Box::new(l)), r)
                 } else {
                     let (l, r) = left.split(k);
-                    let t = Treap::new(x, y, Box::new(r), right);
-                    (l, t)
+                    (l, Treap::new(x, y, Box::new(r), right))
                 }
             }
         };
@@ -125,50 +123,45 @@ impl Treap {
 
 fn read_int() -> i32 {
     let mut str = String::new();
-    std::io::stdin().read_line(&mut str).expect("error");
-    let val: i32 = str.trim().parse().expect("error");
+    std::io::stdin().read_line(&mut str).ok().unwrap();
+    let val: i32 = str.trim().parse().ok().unwrap();
     val
 }
 
 fn read_ints() -> (i32, i32) {
     let mut str = String::new();
-    std::io::stdin().read_line(&mut str).expect("error");
+    std::io::stdin().read_line(&mut str).ok().unwrap();
     let vars: Vec<&str> = str.split(" ").collect();
 
-    let a: i32 = vars[0].trim().parse().expect("error");
-    let B: i32 = vars[1].trim().parse().expect("error");
+    let a: i32 = vars[0].trim().parse().ok().unwrap();
+    let B: i32 = vars[1].trim().parse().ok().unwrap();
     (a, B)
 }
 
-// a = 2153
-// c = 5737
-// m = 21054
-
-const A: u128 = 21054;
-const C: u128 = 5737;
-const M: u128 = 2153;
-const MAX: f64 = 1_000_000_000.0;
+const A: i32 = 1366;
+const C: i32 = 150889;
+const M: i32 = 714025;
 
 struct Random {
-    seed: u128
+    seed: i32
 }
 
 impl Random {
     fn new() -> Self {
-        let cur_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("").as_millis();
+        let cur_time = 0x114514;
         let seed = cur_time % M;
         return Random { seed };
     }
 
     fn next(&mut self) -> i32 {
         self.seed = (A * self.seed + C) % M;
-        let divided = (self.seed as f64) / (M as f64);
-        return (divided * MAX) as i32;
+        self.seed
     }
 }
 
 fn main() {
-    let mut rand = Random::new();
+    let mut random = Random::new();
+    random.next();
 
     let mut n = read_int();
     let mut treap = Treap::Nil;
@@ -178,7 +171,7 @@ fn main() {
         let (op, val) = read_ints();
 
         match op {
-            1 => treap = treap.push(val, rand.next()),
+            1 => treap = treap.push(val, random.next()),
             0 => println!("{}", treap.get(val as usize)),
             _ => treap = treap.del(val),
         }
