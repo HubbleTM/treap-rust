@@ -1,162 +1,186 @@
-use rand::{Rng, random};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone)]
-enum NodeValue where {
-    Node(i32, i32, usize, Box<NodeValue>, Box<NodeValue>),
+enum Treap where {
+    Node(i32, i32, usize, Box<Treap>, Box<Treap>),
     Nil,
 }
 
-impl NodeValue {
+impl Treap {
+    pub fn new(x: i32, y: i32, left: Box<Treap>, right: Box<Treap>) -> Treap {
+        let mut t = Treap::Node(x, y, 1, left, right);
+        t.update_size();
+        t
+    }
+
+    fn size(&self) -> usize {
+        return match self {
+            Treap::Nil => 0,
+            Treap::Node(_, _, sz, ..) => *sz
+        };
+    }
+
     fn update_size(&mut self) -> usize {
         return match self {
-            NodeValue::Nil => {
+            Treap::Nil => {
                 0
             }
 
-            NodeValue::Node(_, _, size, left, right) => {
+            Treap::Node(_, _, size, left, right) => {
                 *size = 1 + left.size() + right.size();
                 *size
             }
         };
     }
 
-    fn size(&self) -> usize {
+    fn split(self, k: i32) -> (Self, Self) {
+        use Treap::*;
+
         return match self {
-            NodeValue::Nil => 0,
-            NodeValue::Node(_, _, sz, ..) => *sz
-        };
-    }
-
-    pub fn new(x: i32, y: i32, left: Box<NodeValue>, right: Box<NodeValue>) -> NodeValue {
-        let mut t = NodeValue::Node(x, y, 1, left, right);
-        t.update_size();
-        t
-    }
-}
-
-struct Tree {
-    root: Box<NodeValue>
-}
-
-impl Tree {
-    fn split(t: Box<NodeValue>, x: i32) -> (Box<NodeValue>, Box<NodeValue>) {
-        return match t.as_ref() {
-            NodeValue::Nil => (Box::new(NodeValue::Nil), Box::new(NodeValue::Nil)),
-
-            NodeValue::Node(tx, ty, size, left, right) => if *tx <= x {
-                let (l, r) = Tree::split(right.clone(), x);
-                let t = NodeValue::new(*tx, *ty, left.clone(), l);
-                (Box::new(t), r)
-            } else {
-                let (l, r) = Tree::split(left.clone(), x);
-                let t = NodeValue::new(*tx, *ty, r, right.clone());
-                (l, Box::new(t))
+            Nil => (Nil, Nil),
+            Node(x, y, _, left, right) => {
+                if x <= k {
+                    let (l, r) = right.split(k);
+                    let t = Treap::new(x, y, left, Box::new(l));
+                    (t, r)
+                } else {
+                    let (l, r) = left.split(k);
+                    let t = Treap::new(x, y, Box::new(r), right);
+                    (l, t)
+                }
             }
         };
     }
 
+    fn merge(t1: Self, t2: Self) -> Self {
+        use Treap::*;
 
-    fn merge(t1: Box<NodeValue>, t2: Box<NodeValue>) -> Box<NodeValue> {
-        let tr1 = t1.as_ref();
-        let tr2 = t2.as_ref();
-
-        if let NodeValue::Nil = tr1 {
-            return t2;
-        }
-
-        if let NodeValue::Nil = tr2 {
-            return t1;
-        }
-
-        if let (
-            NodeValue::Node(x1, y1, _, l1, r1),
-            NodeValue::Node(x2, y2, _, l2, r2)
-        ) = (tr1, tr2) {
-            return if y1 > y2 {
-                let mut t = NodeValue::new(*x1, *y1, l1.clone(), Tree::merge(r1.clone(), t2));
-                Box::new(t)
-            } else {
-                let mut t = NodeValue::new(*x2, *y2, Tree::merge(t1, l2.clone()), r2.clone());
-                Box::new(t)
-            };
-        }
-
-        return Box::new(NodeValue::Nil);
+        return match (t1, t2) {
+            (Nil, Nil) => Nil,
+            (t, Nil) => t,
+            (Nil, t) => t,
+            (Node(lx, ly, _, ll, lr), Node(rx, ry, _, rl, rr)) => {
+                if ly > ry {
+                    let t2 = Treap::new(rx, ry, rl, rr);
+                    Treap::new(lx, ly, ll, Box::new(Treap::merge(*lr, t2)))
+                } else {
+                    let t1 = Treap::new(lx, ly, ll, lr);
+                    Treap::new(rx, ry, Box::new(Treap::merge(t1, *rl)), rr)
+                }
+            }
+        };
     }
 
-    fn new() -> Tree {
-        Tree {
-            root: Box::new(NodeValue::Nil),
-        }
-    }
+    fn push(self, x: i32, y: i32) -> Self {
+        use Treap::*;
 
-    fn push(&mut self, x: i32) {
-        let node = NodeValue::new(x, random(), Box::new(NodeValue::Nil), Box::new(NodeValue::Nil));
-
-        match self.root.as_ref() {
-            NodeValue::Nil => self.root = Box::from(node),
+        let node = Treap::new(x, y, Box::new(Treap::Nil), Box::new(Treap::Nil));
+        return match self {
+            Nil => node,
             _ => {
-                let (l, r) = Tree::split(self.root.clone(), x);
-                let l = Tree::merge(l, Box::new(node));
-                self.root = Tree::merge(l, r);
+                let (l, r) = self.split(x);
+                let left = Treap::merge(l, node);
+                Treap::merge(left, r)
             }
-        }
+        };
     }
 
-    fn get(&self, k: usize) -> Box<NodeValue> {
-        return Tree::get_rec(&self.root, k);
+    fn get(&self, k: usize) -> i32 {
+        use Treap::*;
+
+        return match self {
+            Nil => 0,
+            Node(x, _, _, l, r) => {
+                if r.size() + 1 < k {
+                    return l.get(k - r.size() - 1);
+                }
+
+                if r.size() + 1 == k {
+                    return *x;
+                }
+
+                return r.get(k);
+            }
+        };
     }
 
-    fn get_rec(t: &Box<NodeValue>, k: usize) -> Box<NodeValue> {
-        if let NodeValue::Node(.., l, r) = t.as_ref() {
-            if t.size() < k {
-                return Box::new(NodeValue::Nil);
+    fn del(self, k: i32) -> Self {
+        use Treap::*;
+
+        return match self {
+            Nil => Nil,
+            Node(x, y, sz, l, r) => {
+                if x == k {
+                    return Treap::merge(*l, *r);
+                }
+
+                if x < k {
+                    return Treap::new(x, y, l, Box::new(r.del(k)));
+                }
+
+                return Treap::new(x, y, Box::new(l.del(k)), r);
             }
+        };
+    }
+}
 
-            if l.size() + 1 < k {
-                return Tree::get_rec(r, k);
-            }
+fn read_int() -> i32 {
+    let mut str = String::new();
+    std::io::stdin().read_line(&mut str).expect("error");
+    let val: i32 = str.trim().parse().expect("error");
+    val
+}
 
-            if l.size() + 1 == k {
-                return t.clone();
-            }
+fn read_ints() -> (i32, i32) {
+    let mut str = String::new();
+    std::io::stdin().read_line(&mut str).expect("error");
+    let vars: Vec<&str> = str.split(" ").collect();
 
-            return Tree::get_rec(l, k);
-        }
+    let a: i32 = vars[0].trim().parse().expect("error");
+    let B: i32 = vars[1].trim().parse().expect("error");
+    (a, B)
+}
 
-        return Box::new(NodeValue::Nil);
+// a = 2153
+// c = 5737
+// m = 21054
+
+const A: u128 = 21054;
+const C: u128 = 5737;
+const M: u128 = 2153;
+const MAX: f64 = 1_000_000_000.0;
+
+struct Random {
+    seed: u128
+}
+
+impl Random {
+    fn new() -> Self {
+        let cur_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("").as_millis();
+        let seed = cur_time % M;
+        return Random { seed };
     }
 
-    fn del(&mut self, x: i32) {
-        let (l, r) = Tree::split(self.root.clone(), x);
-        self.root = Tree::merge(Tree::del_rec(&l, x), r);
-    }
-
-    fn del_rec(t: &Box<NodeValue>, x: i32) -> Box<NodeValue> {
-        if let NodeValue::Node(tx, ty, _, l, r) = t.as_ref() {
-            if *tx == x {
-                return l.clone();
-            }
-
-            return Box::new(NodeValue::new(*tx, *ty, l.clone(), Tree::del_rec(r, x)));
-        }
-        return Box::new(NodeValue::Nil);
+    fn next(&mut self) -> i32 {
+        self.seed = (A * self.seed + C) % M;
+        let divided = (self.seed as f64) / (M as f64);
+        return (divided * MAX) as i32;
     }
 }
 
 fn main() {
-    let mut tree = Tree::new();
-    tree.push(10);
-    tree.push(5);
-    tree.push(9);
+    let mut rand = Random::new();
 
-    println!("{}", tree.root.size());
-    tree.del(9);
-    println!("{}", tree.root.size());
+    let mut n = read_int();
+    let mut treap = Treap::Nil;
 
-    let res = tree.get(1);
-    match res.as_ref() {
-        NodeValue::Node(x, ..) => println!("{}", x),
-        _ => println!("Oops!"),
+
+    for i in 0..n {
+        let (op, val) = read_ints();
+
+        match op {
+            1 => treap = treap.push(val, rand.next()),
+            0 => println!("{}", treap.get(val as usize)),
+            _ => treap = treap.del(val),
+        }
     }
 }
