@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 enum Treap where {
     Node(i32, i32, usize, Box<Treap>, Box<Treap>),
     Nil,
@@ -138,12 +136,12 @@ fn read_ints() -> (i32, i32) {
     (a, B)
 }
 
-const A: i32 = 1366;
-const C: i32 = 150889;
-const M: i32 = 714025;
+const A: i64 = 1366;
+const C: i64 = 150889;
+const M: i64 = 714025;
 
 struct Random {
-    seed: i32
+    seed: i64
 }
 
 impl Random {
@@ -155,7 +153,7 @@ impl Random {
 
     fn next(&mut self) -> i32 {
         self.seed = (A * self.seed + C) % M;
-        self.seed
+        self.seed as i32
     }
 }
 
@@ -163,10 +161,9 @@ fn main() {
     let mut random = Random::new();
     random.next();
 
-    let mut n = read_int();
     let mut treap = Treap::Nil;
 
-
+    let mut n = read_int();
     for i in 0..n {
         let (op, val) = read_ints();
 
