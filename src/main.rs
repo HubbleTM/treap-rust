@@ -1,3 +1,6 @@
+use std::cmp::max;
+use std::io::Read;
+
 enum Treap where {
     Node(i32, i32, usize, Box<Treap>, Box<Treap>),
     Nil,
@@ -117,24 +120,40 @@ impl Treap {
             }
         };
     }
+
+    fn deep(&self) -> i32 {
+        use Treap::*;
+
+        return match self {
+            Nil => 0,
+            Node(.., l, r) => {
+                max(l.deep(), r.deep()) + 1
+            }
+        };
+    }
 }
 
-fn read_int() -> i32 {
-    let mut str = String::new();
-    std::io::stdin().read_line(&mut str).ok().unwrap();
-    let val: i32 = str.trim().parse().ok().unwrap();
-    val
+fn get_word() -> String {
+    let mut stdin = std::io::stdin();
+    let mut u8b: [u8; 1] = [0];
+    loop {
+        let mut buf: Vec<u8> = Vec::with_capacity(16);
+        loop {
+            let res = stdin.read(&mut u8b);
+            if res.unwrap_or(0) == 0 || u8b[0] <= b' ' {
+                break;
+            } else {
+                buf.push(u8b[0]);
+            }
+        }
+        if buf.len() >= 1 {
+            let ret = String::from_utf8(buf).unwrap();
+            return ret;
+        }
+    }
 }
 
-fn read_ints() -> (i32, i32) {
-    let mut str = String::new();
-    std::io::stdin().read_line(&mut str).ok().unwrap();
-    let vars: Vec<&str> = str.split(" ").collect();
-
-    let a: i32 = vars[0].trim().parse().ok().unwrap();
-    let B: i32 = vars[1].trim().parse().ok().unwrap();
-    (a, B)
-}
+fn get() -> i32 { get_word().parse().ok().unwrap() }
 
 const A: i64 = 1366;
 const C: i64 = 150889;
@@ -162,10 +181,10 @@ fn main() {
     random.next();
 
     let mut treap = Treap::Nil;
-
-    let mut n = read_int();
+    let mut n: i32 = get();
     for i in 0..n {
-        let (op, val) = read_ints();
+        let op: i32 = get();
+        let val: i32 = get();
 
         match op {
             1 => treap = treap.push(val, random.next()),
